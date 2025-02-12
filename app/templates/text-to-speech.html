@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Text to Speech Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px 10px 10px 0;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .audio-controls {
+            margin-top: 20px;
+        }
+        nav {
+            margin-bottom: 30px;
+        }
+        nav a {
+            color: #0066cc;
+            text-decoration: none;
+            margin-right: 20px;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">← Back to Voice Assistant</a>
+    </nav>
+
+    <h1>Text to Speech Generator</h1>
+    
+    <div class="container">
+        <label for="text">Enter your text:</label>
+        <textarea id="text" placeholder="Type or paste your text here..."></textarea>
+        
+        <div class="controls">
+            <select id="voice">
+                <option value="en-US-JennyNeural">Jenny (US English)</option>
+                <option value="en-GB-SoniaNeural">Sonia (British English)</option>
+                <option value="en-AU-NatashaNeural">Natasha (Australian English)</option>
+            </select>
+            <button id="generateButton">Generate Speech</button>
+            <button id="downloadButton" disabled>Download Audio</button>
+        </div>
+
+        <div id="status" style="display: none;"></div>
+
+        <div class="audio-controls">
+            <audio id="audioPlayer" controls style="display: none;"></audio>
+        </div>
+    </div>
+
+    <script>
+        const text = document.getElementById('text');
+        const voice = document.getElementById('voice');
+        const generateButton = document.getElementById('generateButton');
+        const downloadButton = document.getElementById('downloadButton');
+        const status = document.getElementById('status');
+        const audioPlayer = document.getElementById('audioPlayer');
+        
+        let audioBlob = null;
+
+        generateButton.addEventListener('click', async () => {
+            if (!text.value.trim()) {
+                showStatus('Please enter some text.', 'error');
+                return;
+            }
+
+            try {
+                generateButton.disabled = true;
+                downloadButton.disabled = true;
+                audioPlayer.style.display = 'none';
+                showStatus('Generating speech...', 'info');
+
+                const response = await fetch('/generate-speech', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: text.value,
+                        voice: voice.value
+                    })
+                });
+
+                if (response.ok) {
+                    audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.style.display = 'block';
+                    
+                    downloadButton.disabled = false;
+                    showStatus('Speech generated successfully!', 'success');
+                } else {
+                    const error = await response.json();
+                    showStatus(`Error: ${error.error}`, 'error');
+                }
+            } catch (err) {
+                showStatus(`Error: ${err.message}`, 'error');
+            } finally {
+                generateButton.disabled = false;
+            }
+        });
+
+        downloadButton.addEventListener('click', () => {
+            if (audioBlob) {
+                const url = URL.createObjectURL(audioBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'generated_speech.mp3';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        });
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.style.display = 'block';
+            status.className = type;
+        }
+    </script>
+</body>
+</html> 

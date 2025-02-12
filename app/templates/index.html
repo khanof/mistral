@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Recorder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #result, #aiResponse {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-height: 100px;
+        }
+        .recording {
+            background-color: #ff4444;
+            color: white;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .hidden {
+            display: none;
+        }
+        .audio-controls button {
+            min-width: 100px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Voice Assistant</h1>
+    
+    <div class="section">
+        <h2>Voice Input</h2>
+        <div class="controls">
+            <button id="recordButton">Record</button>
+            <button id="stopButton" disabled>Stop</button>
+        </div>
+        <div id="result">
+            <p>Transcription will appear here...</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>AI Response</h2>
+        <div id="aiResponse">
+            <p>AI response will appear here...</p>
+        </div>
+        <div class="audio-controls">
+            <button id="playButton" class="hidden">Play Response</button>
+            <button id="stopPlayButton" class="hidden">Stop Playing</button>
+        </div>
+        <audio id="waitingPlayer" style="display:none;"></audio>
+        <audio id="mimicPlayer" style="display:none;"></audio>
+        <audio id="audioPlayer" style="display:none;"></audio>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isProcessing = false;
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+        const result = document.getElementById('result');
+        const aiResponse = document.getElementById('aiResponse');
+        const playButton = document.getElementById('playButton');
+        const stopPlayButton = document.getElementById('stopPlayButton');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const waitingPlayer = document.getElementById('waitingPlayer');
+        const mimicPlayer = document.getElementById('mimicPlayer');
+        
+        const waitFiles = ['wait1.mp3', 'wait2.mp3', 'wait3.mp3'];
+        const mimicFiles = ['mimic1.mp3', 'mimic2.mp3', 'mimic3.mp3'];
+
+        function playRandomWaitMessage() {
+            console.log("Playing wait message");  // Debug log
+            const randomFile = waitFiles[Math.floor(Math.random() * waitFiles.length)];
+            waitingPlayer.src = `/wait/${randomFile}`;
+            waitingPlayer.play().catch(e => console.error('Error playing wait:', e));
+        }
+
+        function playRandomMimicMessage() {
+            console.log("Playing mimic message");  // Debug log
+            const randomFile = mimicFiles[Math.floor(Math.random() * mimicFiles.length)];
+            mimicPlayer.src = `/mimic/${randomFile}`;
+            mimicPlayer.play().catch(e => console.error('Error playing mimic:', e));
+        }
+
+        recordButton.addEventListener('click', async () => {
+            audioChunks = [];
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.start();
+                recordButton.disabled = true;
+                recordButton.classList.add('recording');
+                stopButton.disabled = false;
+                result.innerHTML = 'Recording...';
+                playButton.classList.add('hidden');
+                stopPlayButton.classList.add('hidden');
+                aiResponse.innerHTML = '<p>AI response will appear here...</p>';
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                alert('Error accessing microphone. Please ensure you have granted permission.');
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            mediaRecorder.stop();
+            stopButton.disabled = true;
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.wav');
+
+                try {
+                    result.innerHTML = 'Processing transcription...';
+                    const response = await fetch('/stt', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    if (response.ok) {
+                        result.innerHTML = `<strong>Transcription:</strong><br>${data.text}`;
+                        // Start processing and play initial wait message
+                        isProcessing = true;
+                        playRandomWaitMessage();
+                        await generateResponse(data.text);
+                    } else {
+                        result.innerHTML = `<strong>Error:</strong><br>${data.error}`;
+                        recordButton.disabled = false;
+                    }
+                } catch (err) {
+                    console.error('Error sending audio:', err);
+                    result.innerHTML = 'Error processing audio. Please try again.';
+                    recordButton.disabled = false;
+                }
+            };
+        });
+
+        async function generateResponse(transcription) {
+            try {
+                isProcessing = true;  // Set processing flag at the start
+                aiResponse.innerHTML = 'Generating response...';
+                
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: transcription,
+                        voice: 'en-US-JennyNeural'
+                    })
+                });
+
+                if (response.ok) {
+                    const generatedText = response.headers.get('Generated-Text');
+                    aiResponse.innerHTML = `<strong>AI Response:</strong><br>${generatedText}`;
+                    
+                    // Stop all waiting audio
+                    waitingPlayer.pause();
+                    waitingPlayer.currentTime = 0;
+                    mimicPlayer.pause();
+                    mimicPlayer.currentTime = 0;
+                    
+                    // Create and play response audio
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.play();
+                    
+                    // Update button states
+                    playButton.classList.add('hidden');
+                    stopPlayButton.classList.remove('hidden');
+                } else {
+                    const error = await response.json();
+                    aiResponse.innerHTML = `<strong>Error:</strong><br>${error.error}`;
+                }
+            } catch (err) {
+                console.error('Error generating response:', err);
+                aiResponse.innerHTML = 'Error generating response. Please try again.';
+            } finally {
+                isProcessing = false;  // Clear processing flag
+                recordButton.disabled = false;
+            }
+        }
+
+        // Handle waiting audio end
+        waitingPlayer.addEventListener('ended', () => {
+            console.log("Wait message ended, isProcessing:", isProcessing);  // Debug log
+            if (isProcessing) {
+                playRandomMimicMessage();
+            }
+        });
+
+        // Handle mimic audio end
+        mimicPlayer.addEventListener('ended', () => {
+            console.log("Mimic message ended, isProcessing:", isProcessing);  // Debug log
+            if (isProcessing) {
+                playRandomMimicMessage();
+            }
+        });
+
+        playButton.addEventListener('click', () => {
+            audioPlayer.play();
+            playButton.classList.add('hidden');
+            stopPlayButton.classList.remove('hidden');
+        });
+
+        stopPlayButton.addEventListener('click', () => {
+            audioPlayer.pause();
+            audioPlayer.currentTime = 0;
+            stopPlayButton.classList.add('hidden');
+            playButton.classList.remove('hidden');
+        });
+
+        // Handle response audio ending
+        audioPlayer.addEventListener('ended', () => {
+            stopPlayButton.classList.add('hidden');
+            playButton.classList.remove('hidden');
+        });
+    </script>
+</body>
+</html> 

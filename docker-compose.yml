@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  mistral-api:
+    build: ./mistral
+    container_name: mistral-api
+    ports:
+      - "5000:5000"  # Flask API
+      - "8001:8001"  # vLLM Mistral API
+    volumes:
+      - ./mistral/mistral-models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s 
+
+  tts-api:
+    build: ./tts
+    container_name: tts-api
+    ports:
+      - "5001:5001"
+    restart: unless-stopped
+
+  stt-api:
+    build: ./stt
+    container_name: stt-api
+    ports:
+      - "5002:5002"
+    restart: unless-stopped
+
+  middleware-api:
+    build: ./app
+    container_name: middleware-api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mistral-api
+      - tts-api
+    restart: unless-stopped
+
+volumes:
+  mistral-models:

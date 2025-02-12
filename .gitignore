@@ -1,0 +1,25 @@
+# Mistral models folder
+mistral/mistral-models/
+mistral/mistral-models/*
+
+# Common Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment directories
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db 
