@@ -1,10 +1,14 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask_socketio import SocketIO, emit
 import requests
 import json
 import logging
 import random
+import socketio as client_socketio
 
 app = Flask(__name__)
+# Allow connections from our frontend origin
+socketio = SocketIO(app, cors_allowed_origins=["http://localhost:3000"])
 
 # Configure logging
 logging.basicConfig(
@@ -17,9 +21,57 @@ MISTRAL_URL = "http://mistral-api:8001/generate"  # Docker service name
 TTS_URL = "http://tts-api:5001/tts"              # Docker service name
 WHISPER_URL = "http://stt-api:5002/stt"      # Docker service name
 
+# Create a Socket.IO client to connect to STT API
+stt_client = client_socketio.Client()
+
+@stt_client.on('connect')
+def on_stt_connect():
+    print("Connected to STT service")
+
+@stt_client.on('transcription')
+def on_stt_transcription(data):
+    print("Received transcription from STT:", data)
+    socketio.emit('transcription', data)
+
+@stt_client.on('error')
+def on_stt_error(data):
+    print("Error from STT service:", data)
+    socketio.emit('error', data)
+
+# Connect to STT service using the Docker service name
+try:
+    stt_client.connect('http://stt-api:5002')
+    print("Successfully connected to STT service")
+except Exception as e:
+    print(f"Failed to connect to STT service: {e}")
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/stream')
+def stream():
+    return render_template('stream.html')
+
+@socketio.on('connect')
+def handle_connect():
+    print("Web client connected")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print("Web client disconnected")
+
+@socketio.on('audio_stream')
+def handle_audio_stream(data):
+    if stt_client.connected:
+        stt_client.emit('audio_stream', data)
+    else:
+        print("STT client is not connected!")
+        try:
+            stt_client.connect('http://stt-api:5002')
+            stt_client.emit('audio_stream', data)
+        except Exception as e:
+            print(f"Failed to reconnect to STT service: {e}")
 
 @app.route('/stt', methods=['POST'])
 def speech_to_text():
@@ -147,4 +199,4 @@ def serve_mimic_file(filename):
     return send_from_directory('mimic', filename)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000) 
+    socketio.run(app, host='0.0.0.0', port=3000, allow_unsafe_werkzeug=True) 

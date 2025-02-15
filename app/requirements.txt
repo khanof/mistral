@@ -1,2 +1,4 @@
 flask==2.3.3
-requests==2.31.0 
+requests==2.31.0
+flask-socketio==5.3.6
+python-socketio[client]==5.11.1 

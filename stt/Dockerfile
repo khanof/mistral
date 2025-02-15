@@ -17,6 +17,6 @@ COPY stt_api.py /app/stt_api.py
 
 # Expose API port
 EXPOSE 5002
-
+RUN pip install flask-socketio numpy
 # Start API
 CMD ["python3", "/app/stt_api.py"]

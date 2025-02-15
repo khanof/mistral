@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Stream</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #transcription {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-height: 100px;
+        }
+        .button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .button.recording {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Real-time Speech-to-Text</h1>
+        <button id="startButton" class="button">Start Recording</button>
+        <div id="transcription"></div>
+    </div>
+
+    <script>
+        let socket;
+        let mediaRecorder;
+        let audioContext;
+        let isRecording = false;
+        const startButton = document.getElementById('startButton');
+        const transcriptionDiv = document.getElementById('transcription');
+
+        // Initialize Socket.IO connection
+        function initializeSocket() {
+            socket = io();
+
+            socket.on('connect', () => {
+                console.log('Connected to server');
+            });
+
+            socket.on('transcription', (data) => {
+                console.log('Received transcription:', data);
+                transcriptionDiv.innerHTML += '<div>' + data.text + '</div>';
+            });
+
+            socket.on('error', (data) => {
+                console.error('Error:', data.error);
+                transcriptionDiv.innerHTML += '<div style="color: red;">Error: ' + data.error + '</div>';
+            });
+        }
+
+        // Initialize audio context and socket when page loads
+        function initialize() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 16000
+            });
+            initializeSocket();
+        }
+
+        initialize();
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        channelCount: 1,
+                        sampleRate: 16000
+                    }
+                });
+
+                const sourceNode = audioContext.createMediaStreamSource(stream);
+                const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+
+                sourceNode.connect(processorNode);
+                processorNode.connect(audioContext.destination);
+
+                processorNode.onaudioprocess = (e) => {
+                    if (socket && socket.connected) {
+                        const inputData = e.inputBuffer.getChannelData(0);
+                        socket.emit('audio_stream', Array.from(inputData));
+                    }
+                };
+
+                mediaRecorder = {
+                    stream: stream,
+                    sourceNode: sourceNode,
+                    processorNode: processorNode,
+                    stop: function() {
+                        this.sourceNode.disconnect();
+                        this.processorNode.disconnect();
+                        this.stream.getTracks().forEach(track => track.stop());
+                    }
+                };
+
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                transcriptionDiv.innerHTML += '<div style="color: red;">Error starting recording: ' + error.message + '</div>';
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder) {
+                mediaRecorder.stop();
+            }
+        }
+
+        startButton.addEventListener('click', async () => {
+            if (!isRecording) {
+                if (socket && socket.connected) {
+                    if (audioContext.state === 'suspended') {
+                        await audioContext.resume();
+                    }
+                    socket.emit('start_recording');
+                    await startRecording();
+                    isRecording = true;
+                    startButton.textContent = 'Stop Recording';
+                } else {
+                    console.error('Socket not connected');
+                    transcriptionDiv.innerHTML += '<div style="color: red;">Error: Socket not connected</div>';
+                }
+            } else {
+                if (socket && socket.connected) {
+                    socket.emit('stop_recording');
+                }
+                stopRecording();
+                isRecording = false;
+                startButton.textContent = 'Start Recording';
+            }
+        });
+    </script>
+</body>
+</html> 
