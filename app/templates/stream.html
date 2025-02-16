@@ -56,6 +56,15 @@
                 transcriptionDiv.innerHTML += '<div>' + data.text + '</div>';
             });
 
+            socket.on('silence_timeout', (data) => {
+                console.log('Silence timeout detected:', data);
+                // Stop recording and reset UI
+                stopRecording();
+                isRecording = false;
+                startButton.textContent = 'Start Recording';
+                transcriptionDiv.innerHTML += '<div style="color: orange;">Recording stopped: ' + data.message + '</div>';
+            });
+
             socket.on('error', (data) => {
                 console.error('Error:', data.error);
                 transcriptionDiv.innerHTML += '<div style="color: red;">Error: ' + data.error + '</div>';
@@ -77,12 +86,15 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: {
                         channelCount: 1,
-                        sampleRate: 16000
+                        sampleRate: 16000,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
                     }
                 });
 
                 const sourceNode = audioContext.createMediaStreamSource(stream);
-                const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+                const processorNode = audioContext.createScriptProcessor(8192, 1, 1);
 
                 sourceNode.connect(processorNode);
                 processorNode.connect(audioContext.destination);

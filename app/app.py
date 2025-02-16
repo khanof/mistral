@@ -38,6 +38,12 @@ def on_stt_error(data):
     print("Error from STT service:", data)
     socketio.emit('error', data)
 
+@stt_client.on('silence_timeout')
+def on_stt_silence_timeout(data):
+    print("Silence timeout from STT:", data)
+    # Forward the silence timeout event to the web client
+    socketio.emit('silence_timeout', data)
+
 # Connect to STT service using the Docker service name
 try:
     stt_client.connect('http://stt-api:5002')
