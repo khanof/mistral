@@ -14,7 +14,7 @@ WORKDIR /app
 
 # Copy API script
 COPY stt_api.py /app/stt_api.py
-
+RUN pip install scipy>=1.8.0
 # Expose API port
 EXPOSE 5002
 RUN pip install flask-socketio numpy

@@ -7,6 +7,7 @@ import wave
 import torch
 import time
 import logging
+from scipy import signal  # Add this import
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -14,6 +15,58 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Add noise cancellation configuration
+ENABLE_NOISE_CANCELLATION = True  # Default disabled
+
+def apply_noise_reduction(audio_data, sample_rate=16000):
+    """
+    Apply simple noise reduction using spectral subtraction
+    """
+    try:
+        logger.debug("Applying noise reduction...")
+        
+        # Ensure audio data is the right shape and type
+        audio_data = np.array(audio_data, dtype=np.float32)
+        if len(audio_data.shape) > 1:
+            audio_data = audio_data.flatten()
+            
+        # Parameters for STFT
+        nperseg = 256  # Window size
+        noverlap = 128  # Overlap between windows
+        
+        # Compute STFT
+        f, t, Zxx = signal.stft(audio_data, fs=sample_rate, nperseg=nperseg, noverlap=noverlap)
+        
+        # Compute magnitude spectrogram
+        mag = np.abs(Zxx)
+        
+        # Estimate noise profile from the first few frames
+        noise_profile = np.mean(mag[:, :3], axis=1)
+        
+        # Apply spectral subtraction
+        mag_cleaned = np.maximum(mag - noise_profile[:, np.newaxis], 0)
+        
+        # Reconstruct complex spectrogram
+        Zxx_cleaned = mag_cleaned * np.exp(1j * np.angle(Zxx))
+        
+        # Inverse STFT
+        _, audio_cleaned = signal.istft(Zxx_cleaned, fs=sample_rate, nperseg=nperseg, noverlap=noverlap)
+        
+        # Ensure same length as input
+        audio_cleaned = audio_cleaned[:len(audio_data)]
+        
+        # Normalize
+        if np.max(np.abs(audio_cleaned)) > 0:
+            audio_cleaned = audio_cleaned / np.max(np.abs(audio_cleaned))
+        
+        logger.info(f"Noise reduction applied successfully. Input shape: {audio_data.shape}, Output shape: {audio_cleaned.shape}")
+        return audio_cleaned
+        
+    except Exception as e:
+        logger.error(f"Error in noise reduction: {str(e)}")
+        logger.error(f"Input audio shape: {audio_data.shape if isinstance(audio_data, np.ndarray) else 'not numpy array'}")
+        return audio_data  # Return original audio if noise reduction fails
 
 print("Loading Whisper model...")
 model = whisper.load_model("tiny")
@@ -67,6 +120,14 @@ class AudioBuffer:
             
         try:
             audio_data = np.array(self.buffer, dtype=np.float32)
+            
+            # Apply noise reduction if enabled
+            if ENABLE_NOISE_CANCELLATION:
+                logger.debug("Noise cancellation is enabled, processing audio...")
+                audio_data = apply_noise_reduction(audio_data, self.sample_rate)
+            else:
+                logger.debug("Noise cancellation is disabled")
+                
             return audio_data
         except Exception as e:
             logger.error(f"Error converting buffer to numpy array: {e}")
@@ -147,6 +208,19 @@ def handle_audio_stream(data):
         logger.error(f"Stream handling error: {str(e)}")
         socketio.emit('error', {'error': str(e)})
         audio_buffer.reset()
+
+@socketio.on('config')
+def handle_config(data):
+    """Handle configuration updates from client"""
+    global ENABLE_NOISE_CANCELLATION
+    try:
+        if 'noise_cancellation' in data:
+            ENABLE_NOISE_CANCELLATION = bool(data['noise_cancellation'])
+            logger.info(f"Noise cancellation {'enabled' if ENABLE_NOISE_CANCELLATION else 'disabled'}")
+            socketio.emit('config_update', {'noise_cancellation': ENABLE_NOISE_CANCELLATION})
+    except Exception as e:
+        logger.error(f"Error updating configuration: {e}")
+        socketio.emit('error', {'error': str(e)})
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5002, allow_unsafe_werkzeug=True)
