@@ -3,6 +3,12 @@ uvicorn==0.15.0
 websockets==10.0
 celery==5.2.3
 redis==4.0.2
+numpy==1.23.5
+torch==2.0.1
 openai-whisper==20230314
-numpy==1.21.4
-python-multipart==0.0.5 
+numba==0.56.4
+python-multipart==0.0.5
+aiofiles==0.8.0
+soundfile==0.12.1
+pydub==0.25.1
+psutil==5.9.0 

@@ -1,0 +1,16 @@
+2025/02/18 20:00:44 [error] 29#29: *1 connect() failed (111: Connection refused) while connecting to upstream, client: 172.21.0.2, server: localhost, request: "GET /ws HTTP/1.1", upstream: "http://172.21.0.2:8000/ws", host: "nginx"
+2025/02/18 20:00:44 [info] 29#29: *1 client 172.21.0.2 closed keepalive connection
+2025/02/18 20:02:45 [error] 29#29: *3 connect() failed (111: Connection refused) while connecting to upstream, client: 172.21.0.2, server: localhost, request: "GET /ws HTTP/1.1", upstream: "http://172.21.0.2:8000/ws", host: "nginx"
+2025/02/18 20:02:45 [info] 29#29: *3 client 172.21.0.2 closed keepalive connection
+2025/02/18 20:03:21 [error] 29#29: *5 connect() failed (111: Connection refused) while connecting to upstream, client: 172.21.0.2, server: localhost, request: "GET /ws HTTP/1.1", upstream: "http://172.21.0.2:8000/ws", host: "nginx"
+2025/02/18 20:03:21 [info] 29#29: *5 client 172.21.0.2 closed keepalive connection
+2025/02/18 20:03:29 [error] 29#29: *7 connect() failed (111: Connection refused) while connecting to upstream, client: 172.21.0.2, server: localhost, request: "GET /ws HTTP/1.1", upstream: "http://172.21.0.2:8000/ws", host: "nginx"
+2025/02/18 20:03:29 [info] 29#29: *7 client 172.21.0.2 closed keepalive connection
+2025/02/18 20:05:15 [error] 29#29: *9 connect() failed (111: Connection refused) while connecting to upstream, client: 172.21.0.1, server: localhost, request: "GET / HTTP/1.1", upstream: "http://172.21.0.2:8000/", host: "localhost"
+2025/02/18 20:05:19 [error] 29#29: *9 connect() failed (111: Connection refused) while connecting to upstream, client: 172.21.0.1, server: localhost, request: "GET / HTTP/1.1", upstream: "http://172.21.0.2:8000/", host: "localhost"
+2025/02/18 20:05:50 [error] 29#29: *9 connect() failed (111: Connection refused) while connecting to upstream, client: 172.21.0.1, server: localhost, request: "GET / HTTP/1.1", upstream: "http://172.21.0.2:8000/", host: "localhost"
+2025/02/18 20:06:43 [error] 29#29: *9 connect() failed (113: No route to host) while connecting to upstream, client: 172.21.0.1, server: localhost, request: "GET / HTTP/1.1", upstream: "http://172.21.0.2:8000/", host: "localhost"
+2025/02/18 20:06:48 [error] 29#29: *9 connect() failed (113: No route to host) while connecting to upstream, client: 172.21.0.1, server: localhost, request: "GET / HTTP/1.1", upstream: "http://172.21.0.2:8000/", host: "localhost"
+2025/02/18 20:06:51 [error] 29#29: *9 connect() failed (113: No route to host) while connecting to upstream, client: 172.21.0.1, server: localhost, request: "GET / HTTP/1.1", upstream: "http://172.21.0.2:8000/", host: "localhost"
+2025/02/18 20:07:02 [error] 29#29: *9 connect() failed (113: No route to host) while connecting to upstream, client: 172.21.0.1, server: localhost, request: "GET / HTTP/1.1", upstream: "http://172.21.0.2:8000/", host: "localhost"
+2025/02/18 20:50:27 [error] 29#29: *17 connect() failed (113: No route to host) while connecting to upstream, client: 172.21.0.1, server: localhost, request: "GET /static/ HTTP/1.1", upstream: "http://172.21.0.2:8000/static/", host: "localhost"

@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+  test_api:
+    build: .
+    ports:
+      - "8002:8001"
+    networks:
+      - whisper-stt-docker_app_network
+
+networks:
+  whisper-stt-docker_app_network:
+    external: true 

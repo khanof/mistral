@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Whisper STT Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #mic-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            margin: 20px;
+            transition: all 0.3s ease;
+        }
+        #mic-button.recording {
+            background-color: #f44336;
+            animation: pulse 1.5s infinite;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #transcription {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            min-height: 100px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .recording {
+            background-color: #ff4444;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Whisper STT Test</h1>
+    <button id="recordButton">Start Recording</button>
+    <div id="status"></div>
+    <div id="transcription"></div>
+
+    <script>
+        let isRecording = false;
+        let mediaRecorder;
+        let socket;
+        const recordButton = document.getElementById('recordButton');
+        const status = document.getElementById('status');
+        const transcription = document.getElementById('transcription');
+
+        // Connect to WebSocket server
+        function connectWebSocket() {
+            socket = new WebSocket('ws://' + window.location.host + '/ws');
+            
+            socket.onopen = () => {
+                status.textContent = 'Connected to server';
+                status.style.color = '#4CAF50';
+                console.log('WebSocket connected');
+            };
+
+            socket.onclose = (event) => {
+                status.textContent = 'Disconnected from server';
+                status.style.color = '#f44336';
+                console.log('WebSocket closed:', event);
+                
+                // Only try to reconnect if we're still recording
+                if (isRecording) {
+                    console.log('Attempting to reconnect...');
+                    setTimeout(connectWebSocket, 1000);
+                }
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const response = JSON.parse(event.data);
+                    console.log('Received response:', response);
+                    
+                    if (response.status === 'error') {
+                        status.textContent = 'Error: ' + response.message;
+                        status.style.color = '#f44336';
+                    } else {
+                        transcription.textContent = response.text;
+                    }
+                } catch (e) {
+                    console.error('Error processing message:', e);
+                }
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                status.textContent = 'Error connecting to server';
+                status.style.color = '#f44336';
+            };
+        }
+
+        // Handle recording
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        channelCount: 1,
+                        sampleRate: 16000
+                    } 
+                });
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0 && socket && socket.readyState === WebSocket.OPEN) {
+                        console.log('Sending audio chunk:', event.data.size, 'bytes');
+                        socket.send(event.data);
+                    }
+                };
+
+                mediaRecorder.start(1000); // Send data every second
+                isRecording = true;
+                recordButton.classList.add('recording');
+                status.textContent = 'Recording...';
+                status.style.color = '#f44336';
+                console.log('Started recording');
+                
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                status.textContent = 'Error accessing microphone';
+                status.style.color = '#f44336';
+            }
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            isRecording = false;
+            recordButton.textContent = 'Start Recording';
+            recordButton.classList.remove('recording');
+        }
+
+        // Button click handler
+        recordButton.addEventListener('click', async () => {
+            if (!isRecording) {
+                connectWebSocket();
+                await startRecording();
+            } else {
+                stopRecording();
+                if (socket) {
+                    socket.close();
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
