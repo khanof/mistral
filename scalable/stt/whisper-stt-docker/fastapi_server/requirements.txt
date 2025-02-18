@@ -1,0 +1,8 @@
+fastapi==0.68.1
+uvicorn==0.15.0
+websockets==10.0
+celery==5.2.3
+redis==4.0.2
+openai-whisper==20230314
+numpy==1.21.4
+python-multipart==0.0.5 
